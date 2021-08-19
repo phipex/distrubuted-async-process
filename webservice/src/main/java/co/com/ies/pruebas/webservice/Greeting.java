@@ -18,6 +18,8 @@ public  class Greeting implements Serializable {
     @Column(name = "ip_tramited")
     private String ipTramited;
 
+    private Long time;
+
     public Greeting(){}
 
     public Greeting(String content, String ip) {
@@ -49,6 +51,15 @@ public  class Greeting implements Serializable {
         this.ipTramited = ipTramited;
     }
 
+    public Long getTime() {
+        return time;
+    }
+
+    public void setTime(Long time) {
+        this.time = time;
+    }
+
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -59,7 +70,7 @@ public  class Greeting implements Serializable {
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, content, ip, ipTramited);
+        return Objects.hash(id);
     }
 
     @Override
@@ -69,6 +80,7 @@ public  class Greeting implements Serializable {
                 ", content='" + content + '\'' +
                 ", ip='" + ip + '\'' +
                 ", ipTramited='" + ipTramited + '\'' +
+                ", time=" + time +
                 '}';
     }
 }

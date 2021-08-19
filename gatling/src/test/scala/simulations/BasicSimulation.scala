@@ -23,8 +23,8 @@ class BasicSimulation extends Simulation {
         .exitHereIfFailed
 
   setUp(
-    scn.inject(atOnceUsers(100))
-    //scn.inject(rampUsers(1000).during(60.seconds))
+    //scn.inject(atOnceUsers(100))
+    scn.inject(rampUsers(1000).during(60.seconds))
   ).protocols(httpProtocol)
 
 

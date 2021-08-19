@@ -9,6 +9,7 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -42,7 +43,7 @@ public class AsyncProcessServiceImpl implements AsyncProcessService{
         hostAddress = hostAddress1;
     }
 
-    //@Scheduled(fixedDelay = 1000)
+    @Scheduled(fixedDelay = 1000)
     public void scheduleFixedDelayAddTask() {
         //System.out.println("scheduleFixedDelayAddTask Fixed delay task - " + System.currentTimeMillis() / 1000);
 
@@ -66,13 +67,15 @@ public class AsyncProcessServiceImpl implements AsyncProcessService{
 
     @Override
     public void addTasks(){
-        final List<Greeting> greetingsByIpTramitedIsNull = greetingRepository.getGreetingsByIpTramitedIsNull();
+        final List<Greeting> greetingsByIpTramitedIsNull = greetingRepository.findByIpTramitedIsNull();
 
         if(greetingsByIpTramitedIsNull.isEmpty()){
+            System.out.print("-");
             return;
         }
 
         final List<PendingTask<Greeting>> collect = greetingsByIpTramitedIsNull.stream()
+                .filter(greeting -> greeting.getIpTramited() == null)
                 .map(PendingTask::new)
                 .collect(Collectors.toList());
 
@@ -81,7 +84,7 @@ public class AsyncProcessServiceImpl implements AsyncProcessService{
         System.out.println("AsyncProcessServiceImpl.addTasks size = " + size);
     }
 
-    //@Scheduled(fixedDelay = 1000)
+    @Scheduled(fixedDelay = 1000)
     public void scheduleFixedDelayAdquireTask() {
 
         //System.out.println("scheduleFixedDelayAdquireTask Fixed delay task - " + System.currentTimeMillis() / 1000);
@@ -96,10 +99,10 @@ public class AsyncProcessServiceImpl implements AsyncProcessService{
         final boolean tryAcquire = semaphore.tryAcquire();
         //System.out.println("AsyncProcessServiceImpl.scheduleFixedDelayAdquireTask " + tryAcquire + " availablePermits = " + availablePermits);
         if(tryAcquire){
-            //System.out.println("AsyncProcessServiceImpl.scheduleFixedDelayAdquireTask adquire");
+            System.out.println("AsyncProcessServiceImpl.scheduleFixedDelayAdquireTask adquire");
             adquireTasks();
             semaphore.release();
-            //System.out.println("AsyncProcessServiceImpl.scheduleFixedDelayAdquireTask release");
+            System.out.println("AsyncProcessServiceImpl.scheduleFixedDelayAdquireTask release");
         }
 
     }
@@ -107,33 +110,57 @@ public class AsyncProcessServiceImpl implements AsyncProcessService{
     @Override
     public void adquireTasks() {
         final Set<PendingTask<Greeting>> queue = qeueuAsyncRedis.getQueue();
+
+        if(queue.isEmpty()){
+
+            return;
+        }
+
         List<PendingTask<Greeting>> lista = new ArrayList<>(queue);
-        System.out.println("AsyncProcessServiceImpl.adquireTasks lista = " + lista.size());
+        System.out.println("AsyncProcessServiceImpl.adquireTasks lista original = " + lista.size());
 
-        Predicate<PendingTask<Greeting>> vaciosPropios =
-                value -> "".equals(value.getManageFor()) || value.getManageFor() == null;// || hostAddress.equals(value.getManageFor());
+        Predicate<PendingTask<Greeting>> vacios =
+                value -> value.getManageFor() == null && value.getTask().getIpTramited() == null;
 
-        lista = lista.stream().filter(vaciosPropios).collect(Collectors.toList());
+        lista = lista.stream().filter(vacios).collect(Collectors.toList());
+        System.out.println("AsyncProcessServiceImpl.adquireTasks lista filtrada = " + lista.size());
         for (PendingTask<Greeting> next : lista) {
-            final Set<PendingTask<Greeting>> queue1 = qeueuAsyncRedis.getQueue();
-            final int size = queue1.size();
-            System.out.println("AsyncProcessServiceImpl.adquireTasks antessize = " + size);
-
-            queue1.remove(next);
+            System.out.println("AsyncProcessServiceImpl.adquireTasks next = " + next);
             next.setManageFor(hostAddress);
-            qeueuAsyncRedis.getQueue().add(next);
-            System.out.println("AsyncProcessServiceImpl.adquireTasks despues = " + qeueuAsyncRedis.getQueue().size());
+            qeueuAsyncRedis.updateElement(next);
+            System.out.println("AsyncProcessServiceImpl.adquireTasks cantidad despues = " + qeueuAsyncRedis.size());
 
         }
-        processTaskList(lista);
+
+    }
+
+    @Scheduled(fixedDelay = 1000)
+    public void scheduleFixedDelayProcessTask() {
+        final Set<PendingTask<Greeting>> queue = qeueuAsyncRedis.getQueue();
+
+        if(queue.isEmpty()){
+
+            return;
+        }
+
+        final List<PendingTask<Greeting>> taskList = queue.stream()
+                .filter(value -> hostAddress.equals(value.getManageFor()))
+                .filter(value -> value.getTask().getIpTramited() == null)
+                .collect(Collectors.toList());
+
+        processTaskList(taskList);
     }
 
     private void processTaskList(List<PendingTask<Greeting>> lista) {
+        System.out.println("AsyncProcessServiceImpl.processTaskList iniciando lista = " + lista.size());
         for(PendingTask<Greeting> element: lista){
 
             processorDelayed.processElement(element);
-            qeueuAsyncRedis.getQueue().remove(element);
+            //qeueuAsyncRedis.updateElement(element);
+            qeueuAsyncRedis.remove(element);
+
         }
+        System.out.println("AsyncProcessServiceImpl.processTaskList finalizando lista = " + lista.size());
     }
 
 }

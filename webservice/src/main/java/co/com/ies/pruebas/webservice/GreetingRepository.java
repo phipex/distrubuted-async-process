@@ -6,6 +6,6 @@ import java.util.List;
 
 public interface GreetingRepository extends JpaRepository<Greeting, Long> {
 
-    List<Greeting> getGreetingsByIpTramitedIsNull();
+    List<Greeting> findByIpTramitedIsNull();
 
 }

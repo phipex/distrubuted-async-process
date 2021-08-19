@@ -7,8 +7,14 @@ import java.util.Set;
 public abstract class QueueAsyncAbstract<TaskType> {
 
     protected abstract void offer(TaskType element);
+
+    protected abstract void updateElement(TaskType element);
+    protected abstract boolean isContains(TaskType element, Set<TaskType> queue);
+    protected abstract boolean isContains(TaskType element);
+    protected abstract boolean remove(TaskType element);
     protected abstract Set<TaskType> getQueue();
     protected abstract void processElement(TaskType element);
+    protected abstract int size();
 
     public void offerTascks(List<TaskType> elements){
         //agregar a la cola
